@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     env: str = Field(default="local", description="Environment: local or production")
     debug: bool = Field(default=True, description="Debug mode")
     
+    # Logging configuration
+    log_level: str = Field(default="DEBUG", description="Logging level")
+    log_dir: str = Field(default="logs", description="Directory for log files")
+    log_max_file_size_mb: int = Field(default=5, description="Maximum log file size in MB")
+    log_max_backup_count: int = Field(default=10, description="Maximum number of backup log files")
+    log_rotation_hours: int = Field(default=1, description="Hours for log rotation")
+    
     # Database configuration
     db_host: str = Field(default="localhost", description="Database host")
     db_port: int = Field(default=5432, description="Database port")
@@ -66,6 +73,13 @@ class Settings(BaseSettings):
     def is_local(self) -> bool:
         """Check if running in local development environment."""
         return self.env == "local"
+    
+    @property
+    def effective_log_level(self) -> str:
+        """Get effective log level based on environment."""
+        if self.is_production:
+            return "INFO"
+        return "DEBUG" if self.debug else "INFO"
     
     class Config:
         """Pydantic configuration."""

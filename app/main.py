@@ -2,7 +2,6 @@
 FastAPI main application.
 Entry point for the NexPharma API application.
 """
-import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,13 +13,11 @@ from app.config.settings import settings
 from app.config.database import create_tables
 from app.routes.api import api_router
 from app.utils.response import error_response, validation_error_response
+from app.utils.logging_config import setup_logging, get_logger
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO if settings.debug else logging.WARNING,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Setup simple logging
+setup_logging()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -30,9 +27,7 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     # Startup
-    logger.info("Starting NexPharma API application")
-    logger.info(f"Environment: {settings.env}")
-    logger.info(f"Debug mode: {settings.debug}")
+    logger.info(f"Starting NexPharma API - Environment: {settings.env}")
     
     # Create database tables if they don't exist
     try:
@@ -71,16 +66,7 @@ app.add_middleware(
 # Exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """
-    Handle Pydantic validation errors.
-    
-    Args:
-        request: FastAPI request object
-        exc: Validation error exception
-        
-    Returns:
-        JSON response with validation error details
-    """
+    """Handle Pydantic validation errors."""
     logger.warning(f"Validation error on {request.url}: {exc}")
     
     errors = {}
@@ -101,16 +87,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
-    """
-    Handle ValueError exceptions.
-    
-    Args:
-        request: FastAPI request object
-        exc: ValueError exception
-        
-    Returns:
-        JSON response with error details
-    """
+    """Handle ValueError exceptions."""
     logger.warning(f"Value error on {request.url}: {exc}")
     
     response_data = error_response(
@@ -126,16 +103,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """
-    Handle general exceptions.
-    
-    Args:
-        request: FastAPI request object
-        exc: Exception
-        
-    Returns:
-        JSON response with error details
-    """
+    """Handle general exceptions."""
     logger.error(f"Unhandled exception on {request.url}: {exc}", exc_info=True)
     
     response_data = error_response(
@@ -156,12 +124,9 @@ app.include_router(api_router, prefix="/api")
 # Root endpoint
 @app.get("/", tags=["root"])
 def read_root():
-    """
-    Root endpoint.
+    """Root endpoint."""
+    logger.info("Root endpoint accessed")
     
-    Returns:
-        Welcome message and API information
-    """
     return {
         "success": True,
         "message": f"Welcome to {settings.app_name}",
@@ -181,15 +146,12 @@ def read_root():
     }
 
 
-# Health check endpoint (also available at root level)
+# Health check endpoint
 @app.get("/health", tags=["health"])
 def health_check():
-    """
-    Health check endpoint.
+    """Health check endpoint."""
+    logger.info("Health check endpoint accessed")
     
-    Returns:
-        Health status response
-    """
     return {
         "success": True,
         "message": "API is healthy",
@@ -205,10 +167,12 @@ def health_check():
 if __name__ == "__main__":
     import uvicorn
     
+    logger.info(f"Starting uvicorn server on 0.0.0.0:8000")
+    
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.debug,
-        log_level="info" if settings.debug else "warning"
+        log_level=settings.effective_log_level.lower()
     ) 
